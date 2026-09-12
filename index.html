@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICEFALL — Nepal Himalaya / Field Simulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+/* ============ TOKENS ============ */
+:root{
+  --bg-deep:#071719;
+  --bg-secondary:#0C292D;
+  --ice:#DFF8F6;
+  --aqua:#7EE8E1;
+  --glacier:#8BD8FF;
+  --snow:#F7FFFF;
+  --gold:#E8C48A;
+  --muted:rgba(247,255,255,.55);
+  --muted-dim:rgba(247,255,255,.32);
+  --border:rgba(255,255,255,.10);
+  --border-soft:rgba(255,255,255,.06);
+  --ease:cubic-bezier(.22,1,.36,1);
+  --font-head:'Manrope',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+}
+
+*{box-sizing:border-box; margin:0; padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--bg-deep);
+  color:var(--snow);
+  font-family:var(--font-body);
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{ background:var(--aqua); color:var(--bg-deep); }
+
+a{ color:inherit; text-decoration:none; }
+button{ font-family:inherit; background:none; border:none; color:inherit; cursor:pointer; }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
+}
+
+:focus-visible{ outline:1px solid var(--aqua); outline-offset:4px; }
+
+/* ============ GRAIN OVERLAY ============ */
+.grain{
+  position:fixed; inset:0; z-index:200; pointer-events:none;
+  opacity:.05; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* ============ NAV DOTS ============ */
+.wayfinder{
+  position:fixed; right:2.2rem; top:50%; transform:translateY(-50%);
+  z-index:150; display:flex; flex-direction:column; gap:1.1rem;
+}
+.wayfinder button{
+  width:7px; height:7px; border-radius:50%;
+  background:rgba(255,255,255,.2);
+  transition:background .5s var(--ease), transform .5s var(--ease);
+}
+.wayfinder button.active{ background:var(--aqua); transform:scale(1.6); }
+@media (max-width:820px){ .wayfinder{ display:none; } }
+
+/* ============ WORDMARK ============ */
+.wordmark{
+  position:fixed; top:1.8rem; left:2rem; z-index:150;
+  display:flex; align-items:center; gap:.6rem;
+}
+.wordmark svg{ width:20px; height:20px; }
+.wordmark span{
+  font-family:var(--font-head); font-weight:700; font-size:.82rem;
+  letter-spacing:.16em; color:var(--snow);
+}
+@media (max-width:620px){ .wordmark{ top:1.3rem; left:1.2rem; } }
+
+/* ============ SHARED SECTION FRAME ============ */
+section.page{
+  position:relative; width:100%; min-height:100vh;
+  overflow:hidden;
+}
+.label{
+  font-family:var(--font-body); font-size:.72rem; letter-spacing:.14em;
+  color:var(--muted); text-transform:none;
+}
+.dot-sep{ opacity:.4; margin:0 .5em; }
+
+/* ============================================================
+   PAGE 1 — THE MOUNTAIN
+   ============================================================ */
+#page1{ background:
+  radial-gradient(ellipse 120% 60% at 50% 0%, #16343a 0%, transparent 60%),
+  linear-gradient(180deg, #0d2a2d 0%, var(--bg-secondary) 45%, var(--bg-deep) 100%);
+}
+
+.hero{
+  position:relative; height:100vh; display:flex; flex-direction:column;
+  justify-content:flex-end; align-items:center;
+  padding:0 1.5rem 4.5rem;
+}
+
+.sky-glow{
+  position:absolute; inset:0; z-index:0;
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 18%, rgba(232,196,138,.10), transparent 65%),
+    radial-gradient(ellipse 100% 70% at 50% 100%, rgba(126,232,225,.08), transparent 70%);
+}
+
+.mtn-layer{ position:absolute; left:0; right:0; bottom:0; width:100%; }
+.mtn-far{ height:52vh; opacity:.55; }
+.mtn-mid{ height:42vh; opacity:.8; }
+.mtn-near{ height:34vh; }
+
+.stars{ position:absolute; inset:0; z-index:0; }
+.star{
+  position:absolute; border-radius:50%; background:var(--ice);
+  animation:twinkle ease-in-out infinite;
+}
+@keyframes twinkle{ 0%,100%{ opacity:.15; } 50%{ opacity:.85; } }
+
+.mist{
+  position:absolute; height:22vh; width:160%; left:-30%; bottom:8vh;
+  background:linear-gradient(180deg, transparent, rgba(223,248,246,.10) 40%, transparent 80%);
+  filter:blur(18px);
+  animation:drift 46s linear infinite;
+}
+.mist.m2{ bottom:2vh; height:16vh; animation-duration:64s; animation-direction:reverse; opacity:.7; }
+@keyframes drift{ from{ transform:translateX(0); } to{ transform:translateX(20%); } }
+
+.particles{ position:absolute; inset:0; overflow:hidden; }
+.particle{
+  position:absolute; bottom:-2%; border-radius:50%;
+  background:rgba(223,248,246,.5);
+  animation:rise linear infinite;
+}
+@keyframes rise{
+  0%{ transform:translateY(0) translateX(0); opacity:0; }
+  10%{ opacity:.6; }
+  90%{ opacity:.3; }
+  100%{ transform:translateY(-100vh) translateX(20px); opacity:0; }
+}
+
+.hero-copy{ position:relative; z-index:5; text-align:center; max-width:56rem; }
+.eyebrow{
+  font-family:var(--font-body); font-size:.75rem; letter-spacing:.1em;
+  color:var(--muted); display:block; margin-bottom:1.4rem;
+  opacity:0; animation:reveal 1.1s var(--ease) .3s forwards;
+}
+h1.headline{
+  font-family:var(--font-head); font-weight:600;
+  font-size:clamp(2.4rem, 6vw, 5.2rem);
+  line-height:1.06; letter-spacing:-.02em;
+  color:var(--snow);
+  opacity:0; animation:reveal 1.3s var(--ease) .5s forwards;
+}
+@keyframes reveal{ from{ opacity:0; transform:translateY(18px); } to{ opacity:1; transform:translateY(0); } }
+
+.enter-cta{
+  margin-top:2.6rem; display:inline-flex; align-items:center; gap:.7rem;
+  padding:.85rem 1.7rem; border:1px solid var(--border);
+  border-radius:999px; font-size:.78rem; letter-spacing:.08em;
+  color:var(--ice); position:relative; overflow:hidden;
+  opacity:0; animation:reveal 1.2s var(--ease) .9s forwards;
+  transition:border-color .6s var(--ease), background .6s var(--ease);
+  backdrop-filter:blur(6px);
+}
+.enter-cta .arrow{ transition:transform .5s var(--ease); }
+.enter-cta:hover{ border-color:rgba(126,232,225,.4); background:rgba(126,232,225,.06); }
+.enter-cta:hover .arrow{ transform:translateY(3px); }
+.enter-cta::after{
+  content:''; position:absolute; inset:0; border-radius:999px;
+  background:radial-gradient(circle at var(--mx,50%) var(--my,50%), rgba(126,232,225,.25), transparent 55%);
+  opacity:0; transition:opacity .4s var(--ease);
+}
+.enter-cta:hover::after{ opacity:1; }
+
+/* ---- interactive 3D specimen ---- */
+.specimen{
+  position:absolute; top:7rem; right:4rem; z-index:6;
+  width:250px; text-align:center;
+  opacity:0; animation:reveal 1.3s var(--ease) 1.15s forwards;
+}
+.specimen-frame{
+  position:relative; width:250px; height:250px; border-radius:50%;
+  border:1px solid var(--border-soft);
+  background:radial-gradient(circle at 50% 40%, rgba(126,232,225,.10), rgba(9,30,33,.15) 70%);
+  backdrop-filter:blur(4px);
+  box-shadow:0 0 60px rgba(126,232,225,.08), inset 0 0 40px rgba(0,0,0,.25);
+  overflow:hidden;
+}
+.specimen-frame canvas{
+  width:100% !important; height:100% !important; display:block;
+  cursor:grab; touch-action:none;
+}
+.specimen-frame:active canvas{ cursor:grabbing; }
+.specimen-frame::after{
+  content:''; position:absolute; inset:0; border-radius:50%;
+  box-shadow:inset 0 0 30px 6px rgba(7,23,25,.55);
+  pointer-events:none;
+}
+.specimen-label{
+  margin-top:.9rem; font-size:.64rem; letter-spacing:.12em; color:var(--muted-dim);
+  line-height:1.6;
+}
+.specimen-label b{ color:var(--aqua); font-weight:600; display:block; font-family:var(--font-head); letter-spacing:.1em; font-size:.68rem; margin-bottom:.15rem; }
+@media (max-width:900px){
+  .specimen{ position:static; margin:0 auto 2.2rem; width:180px; }
+  .specimen-frame{ width:180px; height:180px; margin:0 auto; }
+}
+
+.scroll-hint{
+  position:absolute; bottom:1.8rem; left:50%; transform:translateX(-50%);
+  z-index:5; width:1px; height:34px; background:linear-gradient(var(--border), transparent);
+}
+.scroll-hint::after{
+  content:''; position:absolute; top:0; left:-1.5px; width:4px; height:4px;
+  border-radius:50%; background:var(--aqua);
+  animation:trickle 2.6s var(--ease) infinite;
+}
+@keyframes trickle{ 0%{ top:0; opacity:0;} 20%{opacity:1;} 100%{ top:30px; opacity:0; } }
+
+/* ---- scroll narrative body ---- */
+.field-notes-intro{
+  position:relative; padding:9rem 1.5rem 6rem; max-width:74rem; margin:0 auto;
+}
+.grid-cards{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:1.1rem;
+  margin-top:3.2rem;
+}
+@media (max-width:820px){ .grid-cards{ grid-template-columns:1fr; } }
+
+.glass-card{
+  background:rgba(223,248,246,.03);
+  border:1px solid var(--border-soft);
+  border-radius:20px; padding:1.8rem 1.7rem;
+  backdrop-filter:blur(10px);
+  box-shadow:0 20px 40px -20px rgba(0,0,0,.4);
+  transform:translateY(24px); opacity:0;
+  transition:transform .9s var(--ease), opacity .9s var(--ease), border-color .5s var(--ease), background .5s var(--ease), box-shadow .5s var(--ease);
+}
+.glass-card.in{ transform:translateY(0); opacity:1; }
+.glass-card:hover{ border-color:rgba(126,232,225,.22); background:rgba(126,232,225,.045); box-shadow:0 24px 50px -18px rgba(126,232,225,.12); }
+.glass-card .tag{
+  font-family:var(--font-head); font-weight:700; font-size:.72rem;
+  letter-spacing:.14em; color:var(--aqua); display:block; margin-bottom:.9rem;
+}
+.glass-card p{ font-size:.95rem; line-height:1.6; color:var(--muted); font-weight:300; }
+
+.section-kicker{
+  font-size:.98rem; line-height:1.7; color:var(--muted); font-weight:300;
+  max-width:34rem;
+}
+
+/* ---- signal callout ---- */
+.signal{
+  position:relative; margin:7rem auto 0; max-width:44rem; padding:0 1.5rem 8rem;
+  text-align:center;
+}
+.signal-time{
+  font-family:var(--font-head); font-weight:300; font-size:clamp(2.6rem,7vw,4.5rem);
+  color:var(--glacier); letter-spacing:-.01em;
+  opacity:0; transform:translateY(16px); transition:opacity 1s var(--ease), transform 1s var(--ease);
+}
+.signal.in .signal-time{ opacity:1; transform:translateY(0); }
+.signal-title{
+  font-family:var(--font-head); font-weight:600; font-size:1.4rem;
+  margin-top:.6rem; color:var(--snow);
+  opacity:0; transform:translateY(16px); transition:opacity 1s var(--ease) .12s, transform 1s var(--ease) .12s;
+}
+.signal.in .signal-title{ opacity:1; transform:translateY(0); }
+.signal-body{
+  margin-top:1rem; color:var(--muted); font-size:.92rem; line-height:1.7; font-weight:300;
+  opacity:0; transform:translateY(16px); transition:opacity 1s var(--ease) .22s, transform 1s var(--ease) .22s;
+}
+.signal.in .signal-body{ opacity:1; transform:translateY(0); }
+
+.follow-cta{
+  margin-top:2.4rem; display:inline-flex; align-items:center; gap:.6rem;
+  font-size:.82rem; letter-spacing:.05em; color:var(--aqua);
+  padding-bottom:3px; border-bottom:1px solid rgba(126,232,225,.3);
+  opacity:0; transition:opacity 1s var(--ease) .32s, border-color .4s var(--ease), gap .4s var(--ease);
+}
+.signal.in .follow-cta{ opacity:1; }
+.follow-cta:hover{ gap:.9rem; border-color:var(--aqua); }
+
+/* ============================================================
+   PAGE 2 — THE EVENT
+   ============================================================ */
+#page2{
+  background:
+    radial-gradient(ellipse 90% 50% at 50% 0%, #12313a 0%, transparent 60%),
+    linear-gradient(180deg, #0a2226 0%, #071b1f 55%, var(--bg-deep) 100%);
+  padding:8rem 1.5rem 7rem;
+}
+.p2-inner{ max-width:74rem; margin:0 auto; }
+
+.status-pill{
+  display:inline-flex; align-items:center; gap:.55rem;
+  padding:.5rem 1rem; border:1px solid var(--border); border-radius:999px;
+  font-size:.68rem; letter-spacing:.12em; color:var(--muted);
+}
+.status-dot{ width:6px; height:6px; border-radius:50%; background:var(--aqua); animation:pulse 2.4s ease-in-out infinite; }
+@keyframes pulse{ 0%,100%{ opacity:.4; } 50%{ opacity:1; } }
+
+.p2-header{ margin-top:2.4rem; max-width:38rem; }
+.p2-time{ font-family:var(--font-head); font-size:.85rem; color:var(--glacier); letter-spacing:.04em; }
+h2.headline{
+  font-family:var(--font-head); font-weight:600; font-size:clamp(2rem,4.6vw,3.4rem);
+  letter-spacing:-.015em; line-height:1.1; margin-top:.7rem; color:var(--snow);
+}
+.p2-header .sub{ margin-top:1rem; color:var(--muted); font-size:.98rem; font-weight:300; }
+
+/* ---- aerial lake visual ---- */
+.aerial{
+  margin-top:3.4rem; border-radius:24px; overflow:hidden;
+  border:1px solid var(--border-soft); position:relative; height:44vh; min-height:280px;
+  background:linear-gradient(180deg,#0e2a2f,#081c20);
+  box-shadow:0 30px 60px -25px rgba(0,0,0,.55);
+}
+.aerial svg{ width:100%; height:100%; display:block; }
+
+/* ---- timeline ---- */
+.timeline-wrap{ margin-top:5rem; }
+.timeline-heading{ display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.timeline-heading h3{ font-family:var(--font-head); font-weight:600; font-size:1.3rem; }
+.timeline-heading span{ font-size:.75rem; color:var(--muted-dim); letter-spacing:.06em; }
+
+.timeline{
+  display:flex; gap:0; margin-top:2.6rem; position:relative;
+  border-top:1px solid var(--border);
+}
+.timeline::before{ content:none; }
+@media (max-width:820px){ .timeline{ flex-direction:column; border-top:none; border-left:1px solid var(--border); margin-left:.4rem; } }
+
+.t-node{
+  flex:1; padding:1.6rem 1.2rem 0; position:relative; cursor:pointer;
+  border-right:1px solid var(--border-soft);
+  transition:background .5s var(--ease);
+}
+.t-node:last-child{ border-right:none; }
+@media (max-width:820px){
+  .t-node{ border-right:none; padding:1.3rem 0 1.3rem 1.6rem; }
+}
+.t-node::before{
+  content:''; position:absolute; top:-1px; left:0; width:0%; height:2px; background:var(--aqua);
+  transition:width .5s var(--ease);
+}
+@media (max-width:820px){
+  .t-node::before{ top:0; left:-1px; width:2px; height:0%; }
+}
+.t-node.active::before{ width:100%; }
+@media (max-width:820px){ .t-node.active::before{ height:100%; } }
+.t-node:hover{ background:rgba(126,232,225,.03); }
+
+.t-dot{
+  position:absolute; top:-5px; left:0; width:9px; height:9px; border-radius:50%;
+  background:var(--bg-deep); border:1.5px solid var(--muted-dim);
+  transition:border-color .4s var(--ease), background .4s var(--ease), box-shadow .4s var(--ease);
+}
+@media (max-width:820px){ .t-dot{ left:-5.5px; top:0; } }
+.t-node.active .t-dot{ border-color:var(--aqua); background:var(--aqua); box-shadow:0 0 12px rgba(126,232,225,.6); }
+
+.t-time{ font-family:var(--font-head); font-size:.82rem; color:var(--glacier); }
+.t-node-title{ margin-top:.5rem; font-family:var(--font-head); font-weight:600; font-size:.95rem; color:var(--snow); }
+.t-node-desc{ margin-top:.4rem; font-size:.8rem; line-height:1.55; color:var(--muted); font-weight:300; max-width:16rem; }
+
+.t-panel{
+  margin-top:2.2rem; border:1px solid var(--border-soft); border-radius:18px;
+  background:rgba(223,248,246,.025); backdrop-filter:blur(10px);
+  padding:1.8rem 2rem; min-height:88px;
+  display:flex; align-items:center; gap:1.2rem;
+  opacity:0; transform:translateY(10px); transition:opacity .55s var(--ease), transform .55s var(--ease);
+}
+.t-panel.show{ opacity:1; transform:translateY(0); }
+.t-panel-pulse{ width:8px; height:8px; border-radius:50%; background:var(--aqua); flex-shrink:0; animation:pulse 1.8s ease-in-out infinite; }
+.t-panel-text{ font-size:.92rem; color:var(--ice); font-weight:300; line-height:1.6; }
+.t-panel-text b{ color:var(--snow); font-weight:600; display:block; margin-bottom:.3rem; font-family:var(--font-head); }
+
+/* ---- map ---- */
+.map-wrap{ margin-top:6rem; }
+.map-frame{
+  position:relative; margin-top:2rem; border-radius:24px;
+  border:1px solid var(--border-soft); overflow:hidden;
+  background:radial-gradient(ellipse 80% 60% at 50% 30%, #133137, #081c20);
+  box-shadow:0 30px 60px -25px rgba(0,0,0,.55);
+}
+.map-frame svg{ width:100%; height:auto; display:block; }
+.map-pin{ cursor:pointer; }
+.map-pin circle.core{ transition:r .35s var(--ease), fill .35s var(--ease); }
+.map-pin:hover circle.core, .map-pin.active circle.core{ fill:var(--aqua); }
+.map-pin circle.ring{ animation:pulse 2.6s ease-in-out infinite; }
+.map-label{ font-family:'DM Sans',sans-serif; font-size:9px; fill:var(--muted); letter-spacing:.03em; }
+
+.map-popup{
+  position:absolute; z-index:20; max-width:220px;
+  background:rgba(9,30,33,.92); border:1px solid var(--border);
+  border-radius:14px; padding:1rem 1.1rem; backdrop-filter:blur(12px);
+  opacity:0; pointer-events:none; transform:translateY(6px);
+  transition:opacity .35s var(--ease), transform .35s var(--ease);
+}
+.map-popup.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
+.map-popup .mp-title{ font-family:var(--font-head); font-weight:700; font-size:.72rem; letter-spacing:.08em; color:var(--aqua); }
+.map-popup .mp-body{ margin-top:.4rem; font-size:.8rem; color:var(--muted); line-height:1.5; font-weight:300; }
+
+.sim-flag{
+  display:inline-block; margin-top:1.6rem; font-size:.68rem; letter-spacing:.1em;
+  color:var(--gold); border:1px solid rgba(232,196,138,.25); border-radius:999px;
+  padding:.4rem .9rem;
+}
+
+/* ============================================================
+   PAGE 3 — FIELD NOTES
+   ============================================================ */
+#page3{
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 0%, #163a3a 0%, transparent 62%),
+    linear-gradient(180deg, #0d2b2c 0%, #0a2226 50%, var(--bg-deep) 100%);
+  padding:9rem 1.5rem 0;
+}
+.p3-inner{ max-width:74rem; margin:0 auto; }
+.p3-header{ max-width:36rem; }
+.p3-header .sub{ margin-top:1rem; color:var(--muted); font-size:.98rem; font-weight:300; }
+
+/* notebook */
+.notebook{
+  margin-top:4.5rem; display:grid; grid-template-columns:repeat(4,1fr); gap:1rem;
+}
+@media (max-width:900px){ .notebook{ grid-template-columns:repeat(2,1fr); } }
+@media (max-width:560px){ .notebook{ grid-template-columns:1fr; } }
+
+.nb-card{
+  border:1px solid var(--border-soft); border-radius:18px; padding:1.6rem 1.5rem;
+  background:rgba(223,248,246,.025); cursor:pointer;
+  transition:background .5s var(--ease), border-color .5s var(--ease), transform .5s var(--ease);
+  min-height:150px; display:flex; flex-direction:column; justify-content:space-between;
+}
+.nb-card:hover{ border-color:rgba(126,232,225,.2); transform:translateY(-3px); }
+.nb-card.open{ background:rgba(126,232,225,.05); border-color:rgba(126,232,225,.3); }
+.nb-card .nb-tag{ font-family:var(--font-head); font-weight:700; font-size:.72rem; letter-spacing:.12em; color:var(--glacier); }
+.nb-card .nb-text{
+  margin-top:1rem; font-size:.86rem; color:var(--muted); line-height:1.55; font-weight:300;
+  max-height:0; overflow:hidden; opacity:0; transition:max-height .5s var(--ease), opacity .5s var(--ease), margin .5s var(--ease);
+}
+.nb-card.open .nb-text{ max-height:140px; opacity:1; margin-top:1rem; }
+.nb-card .nb-hint{ font-size:.7rem; color:var(--muted-dim); margin-top:1rem; letter-spacing:.05em; }
+.nb-card.open .nb-hint{ display:none; }
+
+/* glacier hover viz */
+.glacier-viz-wrap{ margin-top:6.5rem; }
+.glacier-frame{
+  position:relative; margin-top:2rem; border-radius:24px; overflow:hidden;
+  border:1px solid var(--border-soft); background:linear-gradient(180deg,#0e2a2f,#081c20);
+  box-shadow:0 30px 60px -25px rgba(0,0,0,.55);
+}
+.glacier-frame svg{ width:100%; height:auto; display:block; }
+.gz{ cursor:pointer; }
+.gz-point circle{ transition:r .3s var(--ease), fill .3s var(--ease); }
+.gz:hover .gz-point circle, .gz.active .gz-point circle{ fill:var(--aqua); r:5; }
+.gz-tip{
+  position:absolute; z-index:20; background:rgba(9,30,33,.92);
+  border:1px solid var(--border); border-radius:12px; padding:.7rem .9rem;
+  font-size:.78rem; color:var(--ice); font-weight:300; max-width:190px;
+  opacity:0; transform:translateY(6px); transition:opacity .3s var(--ease), transform .3s var(--ease);
+  pointer-events:none;
+}
+.gz-tip.show{ opacity:1; transform:translateY(0); }
+.gz-tip b{ display:block; font-family:var(--font-head); font-weight:700; color:var(--aqua); font-size:.68rem; letter-spacing:.08em; margin-bottom:.2rem; }
+
+/* ---- final moment ---- */
+.finale{
+  position:relative; height:100vh; margin-top:8rem;
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  text-align:center; overflow:hidden;
+}
+.finale-bg{ position:absolute; inset:0; z-index:0; }
+.finale-copy{ position:relative; z-index:2; }
+.finale-copy .l1{
+  font-family:var(--font-head); font-weight:600; font-size:clamp(1.7rem,4.4vw,3rem);
+  color:var(--snow); letter-spacing:-.01em;
+  opacity:0; transform:translateY(14px); transition:opacity 1s var(--ease), transform 1s var(--ease);
+}
+.finale-copy .l2{
+  font-family:var(--font-head); font-weight:300; font-size:clamp(1.3rem,3vw,2rem);
+  color:var(--aqua); margin-top:1rem;
+  opacity:0; transform:translateY(14px); transition:opacity 1s var(--ease) .3s, transform 1s var(--ease) .3s;
+}
+.finale.in .l1{ opacity:1; transform:translateY(0); }
+.finale.in .l2{ opacity:1; transform:translateY(0); }
+
+.footer{
+  position:relative; z-index:2; margin-top:3.4rem;
+  display:flex; flex-direction:column; align-items:center; gap:1.6rem;
+  opacity:0; transition:opacity 1s var(--ease) .6s;
+}
+.finale.in .footer{ opacity:1; }
+.footer .foot-label{ font-size:.68rem; letter-spacing:.12em; color:var(--muted-dim); }
+.return-cta{
+  display:inline-flex; align-items:center; gap:.7rem;
+  padding:.85rem 1.7rem; border:1px solid var(--border); border-radius:999px;
+  font-size:.78rem; letter-spacing:.08em; color:var(--ice);
+  transition:border-color .5s var(--ease), background .5s var(--ease), gap .4s var(--ease);
+}
+.return-cta:hover{ border-color:rgba(126,232,225,.4); background:rgba(126,232,225,.06); gap:1rem; }
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+
+<div class="wordmark">
+  <svg viewBox="0 0 24 24" fill="none"><path d="M2 18L9 7L13 13L16 9L22 18H2Z" stroke="#DFF8F6" stroke-width="1.3" stroke-linejoin="round"/></svg>
+  <span>ICEFALL</span>
+</div>
+
+<div class="wayfinder">
+  <button data-target="#page1" class="active" aria-label="The Mountain"></button>
+  <button data-target="#page2" aria-label="The Event"></button>
+  <button data-target="#page3" aria-label="Field Notes"></button>
+</div>
+
+<!-- ============ PAGE 1 ============ -->
+<section class="page" id="page1">
+  <div class="hero">
+    <div class="sky-glow"></div>
+    <div class="stars" id="stars"></div>
+
+    <svg class="mtn-layer mtn-far" viewBox="0 0 1400 500" preserveAspectRatio="none">
+      <polygon points="0,500 0,300 180,150 340,260 520,90 720,240 900,120 1100,270 1260,170 1400,300 1400,500" fill="#12343a"/>
+    </svg>
+    <svg class="mtn-layer mtn-mid" viewBox="0 0 1400 420" preserveAspectRatio="none">
+      <polygon points="0,420 0,260 160,140 300,230 460,100 640,220 820,80 1000,230 1180,150 1400,260 1400,420" fill="#0e2a2f"/>
+    </svg>
+    <svg class="mtn-layer mtn-near" viewBox="0 0 1400 340" preserveAspectRatio="none">
+      <polygon points="0,340 0,220 220,90 420,200 620,60 860,210 1080,110 1260,220 1400,180 1400,340" fill="#081c20"/>
+    </svg>
+
+    <div class="mist m1"></div>
+    <div class="mist m2"></div>
+    <div class="particles" id="particles"></div>
+
+    <div class="specimen">
+      <div class="specimen-frame" id="specimenFrame"></div>
+      <p class="specimen-label"><b>ICE CORE 03</b>Drag to rotate the sample</p>
+    </div>
+
+    <div class="hero-copy">
+      <span class="eyebrow">NEPAL HIMALAYA · FIELD OBSERVATION 07:14</span>
+      <h1 class="headline">Something moved<br>in the mountains.</h1>
+      <a class="enter-cta" href="#field" id="enterCta">
+        <span>ENTER THE FIELD</span>
+        <svg class="arrow" width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M1 5H13M13 5L9 1M13 5L9 9" stroke="#DFF8F6" stroke-width="1.2"/></svg>
+      </a>
+    </div>
+    <div class="scroll-hint"></div>
+  </div>
+
+  <div class="field-notes-intro" id="field">
+    <p class="section-kicker">The glacier has always moved — slower than a season, slower than a memory. Nepal's high valleys hold water the way old stone holds heat: quietly, until conditions change.</p>
+
+    <div class="grid-cards">
+      <div class="glass-card" data-reveal>
+        <span class="tag">ICE</span>
+        <p>Frozen systems store more than water.</p>
+      </div>
+      <div class="glass-card" data-reveal>
+        <span class="tag">WATER</span>
+        <p>Every glacier carries a path downstream.</p>
+      </div>
+      <div class="glass-card" data-reveal>
+        <span class="tag">TIME</span>
+        <p>The mountain changes slowly — until it doesn't.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="signal" id="signal">
+    <div class="signal-time">04:18</div>
+    <div class="signal-title">Unusual water level</div>
+    <p class="signal-body">A remote sensor recorded a rise that did not match the night's conditions.</p>
+    <a class="follow-cta" href="#page2">
+      <span>FOLLOW THE SIGNAL</span>
+      <svg width="12" height="9" viewBox="0 0 14 10" fill="none"><path d="M1 5H13M13 5L9 1M13 5L9 9" stroke="#7EE8E1" stroke-width="1.2"/></svg>
+    </a>
+  </div>
+</section>
+
+<!-- ============ PAGE 2 ============ -->
+<section class="page" id="page2">
+  <div class="p2-inner">
+    <span class="status-pill"><span class="status-dot"></span>FIELD CHANNEL · CONNECTED</span>
+
+    <div class="p2-header">
+      <div class="p2-time">05:07</div>
+      <h2 class="headline">The lake was changing.</h2>
+      <p class="sub">At first, nobody knew why.</p>
+    </div>
+
+    <div class="aerial">
+      <svg viewBox="0 0 1000 460" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <radialGradient id="lakeGrad" cx="50%" cy="45%" r="65%">
+            <stop offset="0%" stop-color="#8BD8FF" stop-opacity=".55"/>
+            <stop offset="55%" stop-color="#1c4a52" stop-opacity=".9"/>
+            <stop offset="100%" stop-color="#081c20"/>
+          </radialGradient>
+        </defs>
+        <rect width="1000" height="460" fill="#0e2a2f"/>
+        <polygon points="0,120 180,40 360,110 520,20 700,100 860,30 1000,90 1000,0 0,0" fill="#123138"/>
+        <ellipse cx="500" cy="290" rx="330" ry="130" fill="url(#lakeGrad)"/>
+        <g opacity=".5" stroke="#DFF8F6" stroke-width="1" fill="none">
+          <path d="M220 260 Q500 220 780 260" >
+            <animate attributeName="d" dur="7s" repeatCount="indefinite"
+              values="M220 260 Q500 220 780 260;M220 270 Q500 240 780 250;M220 260 Q500 220 780 260"/>
+          </path>
+          <path d="M240 320 Q500 300 760 322">
+            <animate attributeName="d" dur="9s" repeatCount="indefinite"
+              values="M240 320 Q500 300 760 322;M240 310 Q500 330 760 312;M240 320 Q500 300 760 322"/>
+          </path>
+        </g>
+      </svg>
+    </div>
+
+    <div class="timeline-wrap">
+      <div class="timeline-heading">
+        <h3>Overnight, in sequence</h3>
+        <span>CLICK A MARKER TO REVIEW THE RECORD</span>
+      </div>
+
+      <div class="timeline" id="timeline">
+        <div class="t-node active" data-i="0">
+          <span class="t-dot"></span>
+          <div class="t-time">04:18</div>
+          <div class="t-node-title">Water level rises</div>
+          <div class="t-node-desc">An isolated sensor reports an unexpected increase.</div>
+        </div>
+        <div class="t-node" data-i="1">
+          <span class="t-dot"></span>
+          <div class="t-time">05:07</div>
+          <div class="t-node-title">Subsurface vibration</div>
+          <div class="t-node-desc">A field station records a short vibration beneath the moraine.</div>
+        </div>
+        <div class="t-node" data-i="2">
+          <span class="t-dot"></span>
+          <div class="t-time">05:42</div>
+          <div class="t-node-title">A new channel appears</div>
+          <div class="t-node-desc">Meltwater begins finding a narrow route through ice and loose rock.</div>
+        </div>
+        <div class="t-node" data-i="3">
+          <span class="t-dot"></span>
+          <div class="t-time">06:10</div>
+          <div class="t-node-title">The valley is warned</div>
+          <div class="t-node-desc">Downstream teams begin checking paths, bridges and low-lying areas.</div>
+        </div>
+        <div class="t-node" data-i="4">
+          <span class="t-dot"></span>
+          <div class="t-time">06:43</div>
+          <div class="t-node-title">The signal disappears</div>
+          <div class="t-node-desc">The sensor goes silent.</div>
+        </div>
+      </div>
+
+      <div class="t-panel show" id="tPanel">
+        <span class="t-panel-pulse"></span>
+        <div class="t-panel-text" id="tPanelText"><b>04:18 — Water level rises</b>An isolated sensor reports an unexpected increase, the first record of the night.</div>
+      </div>
+    </div>
+
+    <div class="map-wrap">
+      <div class="timeline-heading">
+        <h3>Valley overview</h3>
+        <span>CLICK A LOCATION</span>
+      </div>
+
+      <div class="map-frame" id="mapFrame">
+        <svg viewBox="0 0 1000 620" preserveAspectRatio="xMidYMid meet">
+          <g stroke="rgba(255,255,255,.14)" fill="none" stroke-width="1">
+            <ellipse cx="500" cy="310" rx="420" ry="270"/>
+            <ellipse cx="500" cy="310" rx="330" ry="210"/>
+            <ellipse cx="500" cy="310" rx="240" ry="150"/>
+            <ellipse cx="500" cy="310" rx="150" ry="92"/>
+          </g>
+          <!-- glacier -->
+          <polygon points="120,120 260,70 340,140 260,200 150,190" fill="#DFF8F6" opacity=".18"/>
+          <!-- lake -->
+          <ellipse cx="330" cy="215" rx="55" ry="34" fill="#8BD8FF" opacity=".35"/>
+          <!-- river path -->
+          <path d="M330 245 C 380 320, 420 420, 560 520" stroke="#7EE8E1" stroke-width="2" fill="none" opacity=".55"/>
+          <!-- bridge -->
+          <line x1="470" y1="452" x2="500" y2="480" stroke="#E8C48A" stroke-width="2" opacity=".7"/>
+
+          <!-- pins -->
+          <g class="map-pin" data-loc="glacier" data-x="200" data-y="140">
+            <circle class="ring" cx="200" cy="140" r="10" fill="none" stroke="#7EE8E1" stroke-opacity=".4"/>
+            <circle class="core" cx="200" cy="140" r="4" fill="#DFF8F6"/>
+            <text class="map-label" x="214" y="144">GLACIER</text>
+          </g>
+          <g class="map-pin" data-loc="lake" data-x="330" data-y="215">
+            <circle class="ring" cx="330" cy="215" r="10" fill="none" stroke="#7EE8E1" stroke-opacity=".4"/>
+            <circle class="core" cx="330" cy="215" r="4" fill="#DFF8F6"/>
+            <text class="map-label" x="344" y="219">GLACIAL LAKE</text>
+          </g>
+          <g class="map-pin" data-loc="moraine" data-x="270" data-y="260">
+            <circle class="ring" cx="270" cy="260" r="10" fill="none" stroke="#7EE8E1" stroke-opacity=".4"/>
+            <circle class="core" cx="270" cy="260" r="4" fill="#DFF8F6"/>
+            <text class="map-label" x="200" y="280">MORAINE</text>
+          </g>
+          <g class="map-pin" data-loc="pass" data-x="620" data-y="160">
+            <circle class="ring" cx="620" cy="160" r="10" fill="none" stroke="#7EE8E1" stroke-opacity=".4"/>
+            <circle class="core" cx="620" cy="160" r="4" fill="#DFF8F6"/>
+            <text class="map-label" x="634" y="164">MOUNTAIN PASS</text>
+          </g>
+          <g class="map-pin" data-loc="station" data-x="420" data-y="330">
+            <circle class="ring" cx="420" cy="330" r="10" fill="none" stroke="#7EE8E1" stroke-opacity=".4"/>
+            <circle class="core" cx="420" cy="330" r="4" fill="#DFF8F6"/>
+            <text class="map-label" x="434" y="334">FIELD STATION 03</text>
+          </g>
+          <g class="map-pin" data-loc="bridge" data-x="480" data-y="466">
+            <circle class="ring" cx="480" cy="466" r="10" fill="none" stroke="#7EE8E1" stroke-opacity=".4"/>
+            <circle class="core" cx="480" cy="466" r="4" fill="#DFF8F6"/>
+            <text class="map-label" x="494" y="470">BRIDGE</text>
+          </g>
+          <g class="map-pin" data-loc="village" data-x="600" data-y="510">
+            <circle class="ring" cx="600" cy="510" r="10" fill="none" stroke="#7EE8E1" stroke-opacity=".4"/>
+            <circle class="core" cx="600" cy="510" r="4" fill="#DFF8F6"/>
+            <text class="map-label" x="614" y="514">VILLAGE</text>
+          </g>
+          <g class="map-pin" data-loc="river" data-x="560" data-y="520">
+            <circle class="ring" cx="440" cy="400" r="10" fill="none" stroke="#7EE8E1" stroke-opacity=".4"/>
+            <circle class="core" cx="440" cy="400" r="4" fill="#DFF8F6"/>
+            <text class="map-label" x="454" y="404">RIVER</text>
+          </g>
+        </svg>
+        <div class="map-popup" id="mapPopup">
+          <div class="mp-title" id="mpTitle">GLACIER</div>
+          <div class="mp-body" id="mpBody">The source. Cold, layered, and slower than everything downstream of it.</div>
+        </div>
+      </div>
+      <span class="sim-flag">FICTIONAL FIELD SIMULATION</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAGE 3 ============ -->
+<section class="page" id="page3">
+  <div class="p3-inner">
+    <div class="p3-header">
+      <h2 class="headline">The mountain left clues.</h2>
+      <p class="sub">Not every warning arrives as a siren.</p>
+    </div>
+
+    <div class="notebook">
+      <div class="nb-card" data-nb>
+        <span class="nb-tag">OBSERVE</span>
+        <p class="nb-text">Water changed before the valley understood why.</p>
+        <span class="nb-hint">Tap to read</span>
+      </div>
+      <div class="nb-card" data-nb>
+        <span class="nb-tag">LISTEN</span>
+        <p class="nb-text">Small vibrations became meaningful only when combined with the lake readings.</p>
+        <span class="nb-hint">Tap to read</span>
+      </div>
+      <div class="nb-card" data-nb>
+        <span class="nb-tag">TRACE</span>
+        <p class="nb-text">Every channel tells a story about where the mountain is moving water.</p>
+        <span class="nb-hint">Tap to read</span>
+      </div>
+      <div class="nb-card" data-nb>
+        <span class="nb-tag">PROTECT</span>
+        <p class="nb-text">The first responsibility is not prediction. It is giving people enough time to act.</p>
+        <span class="nb-hint">Tap to read</span>
+      </div>
+    </div>
+
+    <div class="glacier-viz-wrap">
+      <div class="timeline-heading">
+        <h3>Field sketch</h3>
+        <span>HOVER TO ANNOTATE</span>
+      </div>
+      <div class="glacier-frame" id="glacierFrame">
+        <svg viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
+          <polygon points="0,500 0,300 150,160 280,260 420,110 560,240 700,90 850,230 1000,170 1000,500" fill="#0e2a2f"/>
+          <polygon points="60,500 60,340 190,220 300,300 420,180 500,260 500,500" fill="#DFF8F6" opacity=".14"/>
+          <ellipse cx="270" cy="380" rx="90" ry="32" fill="#8BD8FF" opacity=".3"/>
+          <path d="M300 400 C 360 440, 430 460, 560 480" stroke="#7EE8E1" stroke-width="2" fill="none" opacity=".5"/>
+
+          <g class="gz gz-point" data-zone="ice" data-x="180" data-y="250">
+            <circle cx="180" cy="250" r="3.5" fill="#DFF8F6"/>
+          </g>
+          <g class="gz gz-point" data-zone="lake" data-x="270" data-y="378">
+            <circle cx="270" cy="378" r="3.5" fill="#DFF8F6"/>
+          </g>
+          <g class="gz gz-point" data-zone="moraine" data-x="360" data-y="330">
+            <circle cx="360" cy="330" r="3.5" fill="#DFF8F6"/>
+          </g>
+          <g class="gz gz-point" data-zone="channel" data-x="440" data-y="440">
+            <circle cx="440" cy="440" r="3.5" fill="#DFF8F6"/>
+          </g>
+          <g class="gz gz-point" data-zone="valley" data-x="700" data-y="460">
+            <circle cx="700" cy="460" r="3.5" fill="#DFF8F6"/>
+          </g>
+        </svg>
+        <div class="gz-tip" id="gzTip"><b>ICE FRONT</b>Where the glacier meets open air, and where change begins.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="finale" id="finale">
+    <div class="finale-bg">
+      <svg viewBox="0 0 1400 500" preserveAspectRatio="none" style="width:100%;height:100%;">
+        <polygon points="0,500 0,280 200,130 380,240 560,90 760,230 940,110 1120,250 1300,150 1400,220 1400,500" fill="#0c2529"/>
+        <polygon points="0,500 0,360 240,240 460,330 680,200 900,320 1120,220 1400,320 1400,500" fill="#081c20"/>
+      </svg>
+    </div>
+    <div class="finale-copy">
+      <p class="l1">The mountain is still moving.</p>
+      <p class="l2">We just learned to listen.</p>
+    </div>
+    <div class="footer">
+      <span class="foot-label">ICEFALL / FICTIONAL FIELD SIMULATION</span>
+      <a class="return-cta" href="#page1">
+        <span>RETURN TO THE MOUNTAIN</span>
+        <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M13 5H1M1 5L5 1M1 5L5 9" stroke="#DFF8F6" stroke-width="1.2"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ===== particles ===== */
+(function(){
+  const wrap = document.getElementById('particles');
+  const n = 26;
+  for(let i=0;i<n;i++){
+    const p = document.createElement('div');
+    p.className='particle';
+    const size = 1.2 + Math.random()*2.6;
+    p.style.width = size+'px';
+    p.style.height = size+'px';
+    p.style.left = (Math.random()*100)+'%';
+    p.style.opacity = (0.3 + Math.random()*0.5).toFixed(2);
+    p.style.filter = Math.random() > 0.6 ? 'blur(1px)' : 'none';
+    p.style.animationDuration = (14 + Math.random()*20)+'s';
+    p.style.animationDelay = (Math.random()*20)+'s';
+    wrap.appendChild(p);
+  }
+})();
+
+/* ===== stars ===== */
+(function(){
+  const wrap = document.getElementById('stars');
+  if(!wrap) return;
+  const n = 60;
+  for(let i=0;i<n;i++){
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = 0.6 + Math.random()*1.4;
+    s.style.width = size+'px';
+    s.style.height = size+'px';
+    s.style.left = (Math.random()*100)+'%';
+    s.style.top = (Math.random()*55)+'%';
+    s.style.animationDuration = (2.5 + Math.random()*4)+'s';
+    s.style.animationDelay = (Math.random()*5)+'s';
+    wrap.appendChild(s);
+  }
+})();
+
+/* ===== buttery smooth scrolling ===== */
+(function(){
+  const fine = matchMedia('(pointer:fine)').matches;
+  let target = window.scrollY;
+  let current = window.scrollY;
+  const ease = 0.32;
+
+  function maxScroll(){ return document.documentElement.scrollHeight - window.innerHeight; }
+  function clamp(v){ return Math.max(0, Math.min(v, maxScroll())); }
+
+  if(fine){
+    window.addEventListener('wheel', function(e){
+      e.preventDefault();
+      target = clamp(target + e.deltaY * 0.9);
+    }, {passive:false});
+  }
+
+  function raf(){
+    current += (target - current) * ease;
+    if(Math.abs(target - current) < 0.05) current = target;
+    window.scrollTo(0, current);
+    requestAnimationFrame(raf);
+  }
+  requestAnimationFrame(raf);
+
+  let syncTimeout;
+  window.addEventListener('scroll', function(){
+    clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(function(){
+      if(Math.abs(window.scrollY - current) > 2){ target = window.scrollY; current = window.scrollY; }
+    }, 60);
+  }, {passive:true});
+
+  window.smoothScrollTo = function(y){ target = clamp(y); };
+
+  document.querySelectorAll('a[href^="#"]').forEach(function(a){
+    a.addEventListener('click', function(e){
+      const id = a.getAttribute('href');
+      const el = document.querySelector(id);
+      if(!el) return;
+      e.preventDefault();
+      const y = el.getBoundingClientRect().top + window.scrollY;
+      window.smoothScrollTo(y);
+    });
+  });
+})();
+
+/* ===== interactive ice-core specimen (three.js) ===== */
+(function(){
+  const holder = document.getElementById('specimenFrame');
+  if(!holder || typeof THREE === 'undefined') return;
+
+  const size = holder.clientWidth || 250;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+  camera.position.set(0, 0.25, 6.4);
+
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(size, size);
+  holder.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0x8bd8ff, 0.6));
+  const key = new THREE.DirectionalLight(0xE8C48A, 1.15);
+  key.position.set(3, 4, 5);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x7EE8E1, 1.5);
+  rim.position.set(-4, -2, -3);
+  scene.add(rim);
+  const fill = new THREE.DirectionalLight(0xDFF8F6, 0.4);
+  fill.position.set(0, -3, 4);
+  scene.add(fill);
+
+  function noise(x, y, z){
+    return Math.sin(x*2.1 + z*1.3) * Math.cos(y*1.7 + x*0.6) * 0.5
+         + Math.sin(y*3.3 + z*2.2) * 0.25
+         + Math.sin(x*4.7 - y*1.1 + z*3.4) * 0.15;
+  }
+
+  const geo = new THREE.IcosahedronGeometry(2.1, 3);
+  const pos = geo.attributes.position;
+  const iceColor = new THREE.Color('#F7FFFF');
+  const aquaColor = new THREE.Color('#7EE8E1');
+  const deepColor = new THREE.Color('#0C292D');
+  const colors = [];
+  for(let i=0; i<pos.count; i++){
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const n = noise(x, y, z);
+    const scale = 1 + n * 0.22;
+    pos.setXYZ(i, x*scale, y*scale, z*scale);
+    const h = Math.min(1, Math.max(0, (y*scale + 2.4) / 4.8));
+    const c = deepColor.clone().lerp(aquaColor, Math.min(1, h*1.3)).lerp(iceColor, Math.max(0, (h-0.6)*2));
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshPhongMaterial({
+    vertexColors:true, flatShading:true, shininess:75,
+    specular:0xbfeeff, transparent:true, opacity:0.97
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  scene.add(mesh);
+
+  const wire = new THREE.LineSegments(
+    new THREE.WireframeGeometry(geo),
+    new THREE.LineBasicMaterial({ color:0xDFF8F6, transparent:true, opacity:0.14 })
+  );
+  mesh.add(wire);
+
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(2.7, 16, 16),
+    new THREE.MeshBasicMaterial({ color:0x7EE8E1, transparent:true, opacity:0.05 })
+  );
+  scene.add(glow);
+
+  let rotX = 0.15, rotY = 0.4;
+  let dragging = false, lastX = 0, lastY = 0, autoRotate = true;
+  const dom = renderer.domElement;
+  dom.style.touchAction = 'none';
+
+  dom.addEventListener('pointerdown', function(e){
+    dragging = true; autoRotate = false;
+    lastX = e.clientX; lastY = e.clientY;
+    dom.setPointerCapture(e.pointerId);
+  });
+  dom.addEventListener('pointermove', function(e){
+    if(!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    rotY += dx * 0.008;
+    rotX = Math.max(-0.9, Math.min(0.9, rotX + dy * 0.008));
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  ['pointerup','pointerleave','pointercancel'].forEach(function(evt){
+    dom.addEventListener(evt, function(){
+      dragging = false;
+      setTimeout(function(){ autoRotate = true; }, 2200);
+    });
+  });
+
+  function animate(){
+    requestAnimationFrame(animate);
+    if(autoRotate) rotY += 0.0022;
+    mesh.rotation.y += (rotY - mesh.rotation.y) * 0.12;
+    mesh.rotation.x += (rotX - mesh.rotation.x) * 0.12;
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', function(){
+    const s = holder.clientWidth || 250;
+    camera.aspect = 1;
+    camera.updateProjectionMatrix();
+    renderer.setSize(s, s);
+  });
+})();
+
+/* ===== CTA glow follows cursor ===== */
+document.getElementById('enterCta').addEventListener('mousemove', function(e){
+  const r = this.getBoundingClientRect();
+  this.style.setProperty('--mx', ((e.clientX-r.left)/r.width*100)+'%');
+  this.style.setProperty('--my', ((e.clientY-r.top)/r.height*100)+'%');
+});
+
+/* ===== parallax mountains ===== */
+const mFar = document.querySelector('.mtn-far');
+const mMid = document.querySelector('.mtn-mid');
+const mNear = document.querySelector('.mtn-near');
+window.addEventListener('scroll', function(){
+  const y = window.scrollY;
+  if(y < window.innerHeight*1.2){
+    mFar.style.transform = `translateY(${y*0.08}px)`;
+    mMid.style.transform = `translateY(${y*0.16}px)`;
+    mNear.style.transform = `translateY(${y*0.26}px)`;
+  }
+}, {passive:true});
+
+/* ===== reveal on scroll ===== */
+const revealTargets = document.querySelectorAll('[data-reveal]');
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach((e,i)=>{
+    if(e.isIntersecting){
+      setTimeout(()=> e.target.classList.add('in'), i*110);
+      io.unobserve(e.target);
+    }
+  });
+},{threshold:.3});
+revealTargets.forEach(t=>io.observe(t));
+
+const signal = document.getElementById('signal');
+const io2 = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{ if(e.isIntersecting){ signal.classList.add('in'); io2.unobserve(signal); } });
+},{threshold:.4});
+io2.observe(signal);
+
+const finale = document.getElementById('finale');
+const io3 = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{ if(e.isIntersecting){ finale.classList.add('in'); io3.unobserve(finale); } });
+},{threshold:.35});
+io3.observe(finale);
+
+/* ===== wayfinder dots ===== */
+const dots = document.querySelectorAll('.wayfinder button');
+dots.forEach(d=>d.addEventListener('click', ()=>{
+  const el = document.querySelector(d.dataset.target);
+  const y = el.getBoundingClientRect().top + window.scrollY;
+  if(window.smoothScrollTo) window.smoothScrollTo(y); else el.scrollIntoView({behavior:'smooth'});
+}));
+const sections = ['#page1','#page2','#page3'].map(s=>document.querySelector(s));
+const io4 = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const idx = sections.indexOf(e.target);
+      dots.forEach((d,i)=>d.classList.toggle('active', i===idx));
+    }
+  });
+},{threshold:.5});
+sections.forEach(s=>io4.observe(s));
+
+/* ===== timeline interactivity ===== */
+const tData = [
+  {t:'04:18', title:'Water level rises', body:"An isolated sensor reports an unexpected increase, the first record of the night."},
+  {t:'05:07', title:'Subsurface vibration', body:"A field station records a short vibration beneath the moraine."},
+  {t:'05:42', title:'A new channel appears', body:"Meltwater begins finding a narrow route through ice and loose rock."},
+  {t:'06:10', title:'The valley is warned', body:"Downstream teams begin checking paths, bridges and low-lying areas."},
+  {t:'06:43', title:'The signal disappears', body:"The sensor goes silent. No further readings are received from this station."}
+];
+const tNodes = document.querySelectorAll('.t-node');
+const tPanel = document.getElementById('tPanel');
+const tPanelText = document.getElementById('tPanelText');
+tNodes.forEach(node=>{
+  node.addEventListener('click', ()=>{
+    tNodes.forEach(n=>n.classList.remove('active'));
+    node.classList.add('active');
+    tPanel.classList.remove('show');
+    const d = tData[+node.dataset.i];
+    setTimeout(()=>{
+      tPanelText.innerHTML = `<b>${d.t} — ${d.title}</b>${d.body}`;
+      tPanel.classList.add('show');
+    }, 180);
+  });
+});
+
+/* ===== map interactivity ===== */
+const mapData = {
+  glacier: {title:'GLACIER', body:'The source. Cold, layered, and slower than everything downstream of it.'},
+  lake: {title:'GLACIAL LAKE', body:'Water level rose overnight, beyond what recent weather explains.'},
+  moraine: {title:'MORAINE', body:'Loose rock and ice debris — the wall the lake presses against.'},
+  pass: {title:'MOUNTAIN PASS', body:'The high route trekking teams use to cross into the upper valley.'},
+  station: {title:'FIELD STATION 03', body:'Last transmission received at 06:43.'},
+  bridge: {title:'BRIDGE', body:'The single crossing between the upper and lower valley roads.'},
+  village: {title:'VILLAGE', body:'Population center closest to the river corridor downstream.'},
+  river: {title:'LOWER VALLEY', body:'Water route estimated to intersect the river corridor.'}
+};
+const mapFrame = document.getElementById('mapFrame');
+const mapPopup = document.getElementById('mapPopup');
+const mpTitle = document.getElementById('mpTitle');
+const mpBody = document.getElementById('mpBody');
+document.querySelectorAll('.map-pin').forEach(pin=>{
+  pin.addEventListener('click', (e)=>{
+    document.querySelectorAll('.map-pin').forEach(p=>p.classList.remove('active'));
+    pin.classList.add('active');
+    const loc = pin.dataset.loc;
+    const d = mapData[loc];
+    mpTitle.textContent = d.title;
+    mpBody.textContent = d.body;
+
+    const rect = mapFrame.getBoundingClientRect();
+    const svgRect = pin.closest('svg').getBoundingClientRect();
+    const scaleX = svgRect.width/1000, scaleY = svgRect.height/620;
+    let px = (+pin.dataset.x)*scaleX + (svgRect.left-rect.left) + 16;
+    let py = (+pin.dataset.y)*scaleY + (svgRect.top-rect.top) - 10;
+    if(px > rect.width - 230) px -= 250;
+    mapPopup.style.left = px+'px';
+    mapPopup.style.top = py+'px';
+    mapPopup.classList.add('show');
+  });
+});
+mapFrame.addEventListener('click', (e)=>{
+  if(!e.target.closest('.map-pin')) mapPopup.classList.remove('show');
+});
+
+/* ===== notebook cards ===== */
+document.querySelectorAll('[data-nb]').forEach(card=>{
+  card.addEventListener('click', ()=> card.classList.toggle('open'));
+});
+
+/* ===== glacier zones ===== */
+const gzData = {
+  ice: {title:'ICE FRONT', body:'Where the glacier meets open air, and where change begins.'},
+  lake: {title:'LAKE', body:'Meltwater collects here, held back by loose rock and old ice.'},
+  moraine: {title:'MORAINE', body:'A natural dam of debris — until pressure finds its weakest point.'},
+  channel: {title:'DRAINAGE CHANNEL', body:'A narrow new path where water found a way through.'},
+  valley: {title:'VALLEY', body:'Everything downstream waits on what happens up here.'}
+};
+const glacierFrame = document.getElementById('glacierFrame');
+const gzTip = document.getElementById('gzTip');
+document.querySelectorAll('.gz').forEach(z=>{
+  const show = (e)=>{
+    document.querySelectorAll('.gz').forEach(o=>o.classList.remove('active'));
+    z.classList.add('active');
+    const d = gzData[z.dataset.zone];
+    gzTip.innerHTML = `<b>${d.title}</b>${d.body}`;
+    const rect = glacierFrame.getBoundingClientRect();
+    const svgRect = z.closest('svg').getBoundingClientRect();
+    const scaleX = svgRect.width/1000, scaleY = svgRect.height/500;
+    let px = (+z.dataset.x)*scaleX + (svgRect.left-rect.left) + 14;
+    let py = (+z.dataset.y)*scaleY + (svgRect.top-rect.top) - 40;
+    if(px > rect.width - 200) px -= 214;
+    gzTip.style.left = px+'px';
+    gzTip.style.top = py+'px';
+    gzTip.classList.add('show');
+  };
+  z.addEventListener('mouseenter', show);
+  z.addEventListener('click', show);
+  z.addEventListener('mouseleave', ()=> gzTip.classList.remove('show'));
+});
+</script>
+</body>
+</html>
